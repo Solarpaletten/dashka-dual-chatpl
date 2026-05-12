@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sprint 4D.2 — Android 12+ data extraction rules.
+
+  This file is the MODERN backup configuration for Android 12 (API 31) and
+  newer. It replaces `backup_rules.xml`, which becomes legacy-only on these
+  versions. Android <= 11 ignores this file.
+
+  Android 12 introduced two SEPARATE backup destinations that must both be
+  configured explicitly:
+
+    1. <cloud-backup>     — Google Drive Auto Backup (historic mechanism)
+    2. <device-transfer>  — Direct phone-to-phone transfer during setup
+                             (Android "Copy apps & data" wizard)
+
+  Both are disabled here by excluding everything (`<exclude domain="..." />`)
+  in addition to the global `android:allowBackup="false"` flag. This is
+  defense in depth: if any future change re-enables allowBackup (for an
+  export/import feature, for example), these explicit excludes still keep
+  history and user preferences out of both Drive backups and direct device
+  transfers.
+
+  DataStore Preferences files live under
+    /data/data/<package>/files/datastore/<name>.preferences_pb
+
+  Excluded DataStores (defensive duplication of the global exclude):
+    - dashka_history
+    - dashka_user_prefs
+
+  See: https://developer.android.com/about/versions/12/backup-restore
+       https://developer.android.com/guide/topics/data/autobackup
+-->
+<data-extraction-rules>
+
+    <!-- Google Drive cloud backup: exclude everything. -->
+    <cloud-backup>
+        <!-- Global exclude: nothing from this app goes to Drive. -->
+        <exclude
+            domain="file"
+            path="." />
+        <exclude
+            domain="database"
+            path="." />
+        <exclude
+            domain="sharedpref"
+            path="." />
+        <exclude
+            domain="external"
+            path="." />
+        <exclude
+            domain="root"
+            path="." />
+
+        <!-- Belt-and-braces explicit excludes for the two DataStore files
+             we know about today. If future code adds more state, the
+             global excludes above already cover it. -->
+        <exclude
+            domain="file"
+            path="datastore/dashka_history.preferences_pb" />
+        <exclude
+            domain="file"
+            path="datastore/dashka_user_prefs.preferences_pb" />
+    </cloud-backup>
+
+    <!-- Direct device-to-device transfer (Android setup wizard's
+         "Copy apps & data" feature): exclude everything.
+
+         Without this, a user moving to a new phone via the official
+         Android transfer could carry their history forward, defeating
+         the privacy goal. -->
+    <device-transfer>
+        <exclude
+            domain="file"
+            path="." />
+        <exclude
+            domain="database"
+            path="." />
+        <exclude
+            domain="sharedpref"
+            path="." />
+        <exclude
+            domain="external"
+            path="." />
+        <exclude
+            domain="root"
+            path="." />
+
+        <exclude
+            domain="file"
+            path="datastore/dashka_history.preferences_pb" />
+        <exclude
+            domain="file"
+            path="datastore/dashka_user_prefs.preferences_pb" />
+    </device-transfer>
+
+</data-extraction-rules>
