@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+        Sprint 4B: FileProvider whitelist for sharing TTS audio + transcripts.
+        Files written to {cacheDir}/share/ become accessible to other apps
+        (Telegram, WhatsApp, Email) via content:// URI when shared.
+
+        Auto-cleanup: Android may evict cacheDir under storage pressure.
+        Files are short-lived — written immediately before share, system
+        cleans them up later.
+    -->
+    <cache-path
+        name="dashka_share"
+        path="share/" />
+</paths>

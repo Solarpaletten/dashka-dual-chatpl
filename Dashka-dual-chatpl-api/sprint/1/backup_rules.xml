@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sprint 4D.2 — Defense in depth against history leak via Auto Backup.
+
+  This file is the LEGACY backup configuration for Android 6.0 – 11.x
+  (API 23 – 30). Android 12+ (API 31+) reads `data_extraction_rules.xml`
+  instead and ignores this file.
+
+  Primary defense is `android:allowBackup="false"` in AndroidManifest, which
+  disables Auto Backup entirely. This file is wired up as a belt-and-braces
+  second line of defense:
+
+    - If a future sprint flips allowBackup back on (e.g., for export/import
+      feature), these rules still keep history + prefs out of Drive.
+    - Some OEM-modified Android distributions historically ignore
+      allowBackup="false" and silently back up anyway. Explicit exclusions
+      survive that bug.
+
+  Excluded DataStore files:
+    - dashka_history       (translation history, 30-entry rolling)
+    - dashka_user_prefs    (voice selection, autoplay toggle)
+
+  DataStore Preferences files live under
+    /data/data/<package>/files/datastore/<name>.preferences_pb
+
+  The `domain` here is the parent directory ("file" = files dir).
+  The `path` is the relative path under that domain.
+
+  See: https://developer.android.com/guide/topics/data/autobackup
+-->
+<full-backup-content>
+    <!-- Explicitly exclude history DataStore. -->
+    <exclude
+        domain="file"
+        path="datastore/dashka_history.preferences_pb" />
+
+    <!-- Explicitly exclude user preferences DataStore. -->
+    <exclude
+        domain="file"
+        path="datastore/dashka_user_prefs.preferences_pb" />
+
+    <!-- Exclude the entire datastore directory as a safety net in case
+         DataStore implementation paths change in future androidx versions. -->
+    <exclude
+        domain="file"
+        path="datastore/" />
+</full-backup-content>
