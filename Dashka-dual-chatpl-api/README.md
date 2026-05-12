@@ -137,3 +137,7 @@ XAI_API_KEY=xai-...
 ---
 
 Solar Team 🚀
+
+github.com/solarpaletten/dashka-dual-chatpl/pull/1
+
+
