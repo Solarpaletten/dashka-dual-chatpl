@@ -1,0 +1,166 @@
+{
+  "summary": {
+    "purpose": "Disable Android Auto Backup and direct device-to-device transfer for translation history and user preferences. Fresh installs of Dashka Translate Lite must start with empty history regardless of whether a previous version was installed on the same Google account.",
+    "scope": "Manifest + two XML rules files only. No Kotlin, no UI, no Compose, no Gradle.",
+    "blocks_resolved": "Privacy violation observed in Leanid's field test: second device installing v0.4.6-mama via Telegram inherited 6 history entries (14:10 timestamps) from a different device's v0.4.6-history-dedup install on the same Google account."
+  },
+  "investigation_summary": {
+    "field_evidence": "Three photos provided by Leanid: (1) phone 1 with v0.4.6-history-dedup showing 6 entries / 14:10; (2) Android Studio with fresh v0.4.6-mama build showing empty history; (3) phone 2 with v0.4.6-mama installed from Telegram showing the same 6 entries / 14:10 from phone 1.",
+    "kimi_initial_hypothesis": "Pre-bundled history files in APK assets/ or res/raw/.",
+    "claude_forensic_verification": "Independent code search confirmed: no assets/ directory exists, no res/raw/ directory exists, no .json or .db files anywhere in repo, no hardcoded entries in Kotlin, no Room or SQLite usage, only runtime DataStore writes.",
+    "true_root_cause": "AndroidManifest.xml line 18: android:allowBackup=\"true\" enables Android Auto Backup. DataStore Preferences files under /data/data/com.solar.dashka/files/datastore/ are automatically backed up to Google Drive (keyed by applicationId + signing certificate + Google account), and automatically restored on install on any device with the same account. Android Studio emulator avoided this because emulator typically has no Google account configured AND/OR uses debug signing certificate that mismatches the release backup.",
+    "kimi_direction_correct": "Privacy framing and severity assessment were correct.",
+    "kimi_technical_specifics_corrected": "Bundled-APK hypothesis was not verified by code search; actual root cause is one layer deeper (OS-level Auto Backup, not in-APK content)."
+  },
+  "files_overview": {
+    "app/src/main/AndroidManifest.xml": {
+      "type": "modified",
+      "lines_added": 2,
+      "lines_removed": 1,
+      "lines_net": 1,
+      "change_kind": "Flip allowBackup true→false; wire dataExtractionRules + fullBackupContent attributes.",
+      "diff_summary": "Three attribute changes on the <application> element. Everything else (FileProvider, MainActivity, permissions, queries) untouched."
+    },
+    "app/src/main/res/xml/backup_rules.xml": {
+      "type": "new",
+      "size_bytes": "~1.6 KB",
+      "purpose": "Legacy backup configuration for Android 6.0 – 11.x. Belt-and-braces second line of defense behind allowBackup=false. Explicitly excludes datastore/dashka_history.preferences_pb and datastore/dashka_user_prefs.preferences_pb, plus the entire datastore/ directory as safety net.",
+      "android_api_target": "23..30"
+    },
+    "app/src/main/res/xml/data_extraction_rules.xml": {
+      "type": "new",
+      "size_bytes": "~2.2 KB",
+      "purpose": "Modern backup configuration for Android 12+. Configures BOTH cloud-backup and device-transfer destinations with global excludes plus explicit DataStore excludes. Without device-transfer rules, the Android setup wizard's 'Copy apps & data' could carry history forward to a new phone.",
+      "android_api_target": "31..36"
+    }
+  },
+  "risks": {
+    "build": "ZERO — no code, no Gradle, no dependencies changed; manifest schema and XML are stable Android API",
+    "type_check": "N/A — no Kotlin or Java touched",
+    "ui_regression": "ZERO — no UI files touched",
+    "runtime_regression": "ZERO — DataStore reads and writes behave identically; only their backup eligibility changes",
+    "current_users_data_loss": "ZERO — existing on-device history is preserved across update; only future fresh installs differ",
+    "existing_google_drive_backups": "Become passive after this release. Drive expires backups automatically after ~60 days of inactivity from the original app. New version with allowBackup=false will not write new backup, and on reinstall will not read existing one (Android backup manager respects the new manifest).",
+    "play_console_impact": "Listing's 'Data safety' form should now correctly state 'no data backed up'. If form was previously submitted as 'data backed up', requires update.",
+    "edge_case_dual_use": "If a user runs v0.4.6-history-dedup (old) and v0.4.7-fix (new) on two devices with same Google account, the OLD device may still write backups. NEW device will refuse to read them. No data corruption possible — old and new use the same DataStore files locally, only backup transport differs.",
+    "edge_case_oem_quirk": "Some historical OEM Android distributions (older Samsung One UI, Xiaomi MIUI) have been documented to occasionally ignore allowBackup=false. Explicit excludes in both XML files cover this scenario as defense in depth."
+  },
+  "expected_behavior_change": {
+    "scenario_A_fresh_install": {
+      "action": "Install v0.4.7-fix on any device that has never had Dashka installed.",
+      "expected": "History list is empty. App requires user to make first translation before any entry appears.",
+      "matches_user_intent": true
+    },
+    "scenario_B_first_use_after_install": {
+      "action": "Make 2 translations: RU→PL, then PL→RU.",
+      "expected": "History shows 2 entries in newest-first order, each with correct flags, source/translated text, voice, and timestamp.",
+      "matches_user_intent": true
+    },
+    "scenario_C_uninstall_reinstall_same_device": {
+      "action": "Uninstall v0.4.7-fix from device, then reinstall the same APK.",
+      "expected": "History is empty. Previous data NOT restored from Google Drive (allowBackup=false prevents both write and read).",
+      "matches_user_intent": true,
+      "previously_broken": true
+    },
+    "scenario_D_install_on_second_device_same_account": {
+      "action": "On a second physical device signed into the same Google account, install v0.4.7-fix (e.g., from Telegram).",
+      "expected": "History is empty. No cross-device restore.",
+      "matches_user_intent": true,
+      "previously_broken": true,
+      "primary_field_test_failure_scenario": true
+    },
+    "scenario_E_update_existing_install": {
+      "action": "On a device running v0.4.6-history-dedup with existing history, update to v0.4.7-fix.",
+      "expected": "History preserved (Android update does not wipe data dir). User keeps their data on this device. No cross-device restore occurs from this point on.",
+      "matches_user_intent": true,
+      "intentional_non_wipe": "Option A — clean break does NOT clear existing-device data."
+    },
+    "scenario_F_device_transfer_wizard": {
+      "action": "User runs Android 12+ 'Copy apps & data' wizard from old phone to new phone.",
+      "expected": "Dashka is restored (so it appears as installed app), but with empty data (device-transfer rules exclude all data domains).",
+      "matches_user_intent": true,
+      "previously_unverified_in_field": true
+    }
+  },
+  "verification_checklist_per_dashka_request": [
+    {
+      "id": "VER-A",
+      "scenario": "Fresh install",
+      "steps": [
+        "On a device that has never had Dashka installed, install v0.4.7-fix APK.",
+        "Open the app.",
+        "Tap the History (clock) icon in the top app bar."
+      ],
+      "expected_result": "History bottom sheet shows empty state — no entries."
+    },
+    {
+      "id": "VER-B",
+      "scenario": "History persists during use",
+      "steps": [
+        "From state at end of VER-A, perform RU→PL translation: type \"Привет\", tap → Польский.",
+        "Tap swap button, type \"Cześć\", tap → Русский.",
+        "Tap History icon."
+      ],
+      "expected_result": "History shows exactly 2 entries, newest first."
+    },
+    {
+      "id": "VER-C",
+      "scenario": "Uninstall + reinstall same device",
+      "steps": [
+        "From state at end of VER-B, uninstall Dashka completely (long-press → uninstall).",
+        "Reinstall the same v0.4.7-fix APK.",
+        "Open the app, tap History."
+      ],
+      "expected_result": "History is empty. No restore from Google Drive."
+    },
+    {
+      "id": "VER-D",
+      "scenario": "Cross-device same account",
+      "steps": [
+        "On phone A: install v0.4.7-fix, make 2 translations (history has 2 entries).",
+        "On phone B (different physical device, same Google account): install the same v0.4.7-fix APK (e.g., via Telegram or direct file transfer).",
+        "Open the app on phone B, tap History."
+      ],
+      "expected_result": "History on phone B is empty. Phone A's 2 entries do NOT appear.",
+      "critical": true,
+      "originally_broken_in_v0_4_6": true
+    },
+    {
+      "id": "VER-E",
+      "scenario": "Update preserves local data",
+      "steps": [
+        "Start with v0.4.6-history-dedup installed and 6 history entries.",
+        "Install v0.4.7-fix as an update (do not uninstall first).",
+        "Open the app, tap History."
+      ],
+      "expected_result": "All 6 existing entries are preserved. User does not lose data when updating."
+    }
+  ],
+  "out_of_scope": [
+    "Kotlin code changes",
+    "UI / Compose modifications",
+    "DataStore schema changes",
+    "History feature redesign",
+    "Wipe-on-upgrade logic (Option B)",
+    "Version-state tracking",
+    "Pro tier features",
+    "Conversation Mode changes",
+    "Swipe gestures",
+    "Landscape dual-pane",
+    "package rename",
+    "Signing key changes",
+    "README updates (stale README is its own concern)",
+    "Test suite addition"
+  ],
+  "sprint_chain": {
+    "previous": [
+      "Sprint 4D.1 (Dashka Translate Lite baseline audit — informational reference)"
+    ],
+    "current": "Sprint 4D.2 (history backup privacy fix)",
+    "next_candidates_post_audit": [
+      "Sprint 4D.3 candidate: README sync to v0.4.7 state",
+      "Sprint 4D.4 candidate: Sprint 4C.7B composition field (parked, separate)",
+      "Sprint 5.x: Pro tier UX planning (post-verification observation)"
+    ]
+  }
+}

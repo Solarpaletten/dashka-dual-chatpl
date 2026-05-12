@@ -1,0 +1,61 @@
+{
+  "sprint": "4D.2",
+  "title": "Disable Auto Backup / Device Transfer — history privacy fix",
+  "branch": "fix/history-backup-privacy",
+  "created_by": "Engineer AI (Claude)",
+  "project": "DashkaAndroid",
+  "files_changed": 3,
+  "files": {
+    "new": [
+      "app/src/main/res/xml/backup_rules.xml",
+      "app/src/main/res/xml/data_extraction_rules.xml"
+    ],
+    "modified": [
+      "app/src/main/AndroidManifest.xml"
+    ],
+    "deleted": []
+  },
+  "forbidden_paths": [
+    "app/src/main/java",
+    "app/src/main/res/values",
+    "app/src/main/res/drawable",
+    "app/src/main/res/mipmap-anydpi-v26",
+    "app/src/main/res/xml/file_paths.xml",
+    "app/build.gradle.kts",
+    "build.gradle.kts",
+    "gradle/libs.versions.toml",
+    "settings.gradle.kts",
+    "gradle.properties",
+    "proguard-rules.pro",
+    "README.md"
+  ],
+  "allowed_paths": [
+    "app/src/main/AndroidManifest.xml",
+    "app/src/main/res/xml/backup_rules.xml",
+    "app/src/main/res/xml/data_extraction_rules.xml"
+  ],
+  "depends_on": "Sprint 4D.1 (baseline audit — informational, no code dependency)",
+  "blocks_resolved": [
+    "Cross-device history restore via Android Auto Backup (Google Drive)",
+    "History carry-over via direct device-to-device transfer (Android 12+ Copy apps & data)",
+    "Privacy violation: history visible on second device with same Google account"
+  ],
+  "requires_build_check": true,
+  "requires_manual_review": true,
+  "requires_audit": true,
+  "rollback_safe": true,
+  "api_contract_changed": false,
+  "kotlin_changed": false,
+  "ui_changed": false,
+  "production_code_modified": false,
+  "deploy_authority": "Architect (Leanid)",
+  "audit_authority": "Audit AI (Kimi)",
+  "coordination": "Coordinator (Dashka)",
+  "strategy": "Option A — clean break (no existing-data wipe logic; passive backup expiry)",
+  "architectural_notes": [
+    "Three-layer defense: allowBackup=false (global), fullBackupContent (Android 6-11), dataExtractionRules (Android 12+)",
+    "No DataStore code changes — runtime behavior of HistoryStorage and UserPreferencesRepository is unchanged",
+    "Existing on-device history NOT wiped — users with current installs keep their data",
+    "Existing Google Drive backups (if any) become unreadable on next install — passive expiry within 60 days of inactivity"
+  ]
+}
